@@ -3,7 +3,7 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                git 'https://github.com/your-repo.git'
+                git branch: 'main', url: 'https://github.com/Annie-Christina-A/Spring_boot'
             }
         }
         stage('Build') {
@@ -18,3 +18,4 @@ pipeline {
         }
     }
 }
+
