@@ -13,7 +13,7 @@ pipeline {
         }
         stage('Run') {
             steps {
-                sh 'java -jar target/*.jar'
+                sh 'java -jar target/$(ls target | grep .jar | head -n 1)'
             }
         }
     }
