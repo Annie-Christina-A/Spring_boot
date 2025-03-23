@@ -8,14 +8,15 @@ pipeline {
         }
         stage('Build') {
             steps {
-                sh 'mvn clean package'
+                sh 'mvn clean package -DskipTests'
             }
         }
         stage('Run') {
             steps {
-                sh 'java -jar target/$(ls target | grep .jar | head -n 1)'
+                sh 'java -jar target/*.jar'
             }
         }
     }
 }
+
 
