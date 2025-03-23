@@ -10,7 +10,7 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                git 'https://your-repo-url.git'
+                git branch: 'main', url: 'https://github.com/your-repo.git'
             }
         }
 
@@ -29,7 +29,7 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo 'Deploying the application...'
-                // Add deployment steps if necessary
+                // Add your deployment command here
             }
         }
     }
@@ -43,7 +43,3 @@ pipeline {
         }
     }
 }
-
-
-
-
