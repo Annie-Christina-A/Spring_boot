@@ -3,8 +3,7 @@ pipeline {
 
     environment {
         APP_NAME = "SpringBootApp"
-        JAR_NAME = "target/*.jar"
-        SERVER_PORT = "8081"  
+        SERVER_PORT = "8081"
     }
 
     stages {
@@ -31,7 +30,7 @@ pipeline {
             steps {
                 sh '''
                 echo "Stopping old application (if running)..."
-                pkill -f "java -jar" || true
+                pgrep -f "target/.*.jar" | xargs kill -9 || true
                 '''
             }
         }
@@ -40,7 +39,9 @@ pipeline {
             steps {
                 sh '''
                 echo "Starting new application..."
-                nohup java -jar ${JAR_NAME} > app.log 2>&1 &
+                JAR_FILE=$(ls target/*.jar | head -n 1)
+                chmod +x $JAR_FILE
+                nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
                 '''
             }
         }
@@ -48,11 +49,10 @@ pipeline {
 
     post {
         success {
-            echo "Build and deployment successful! App is running on port ${SERVER_PORT}"
+            echo "✅ Build and deployment successful! App is running on port ${SERVER_PORT}"
         }
         failure {
-            echo "Build failed. Check the console output for errors."
+            echo "❌ Build failed. Check the console output for errors."
         }
     }
 }
-
