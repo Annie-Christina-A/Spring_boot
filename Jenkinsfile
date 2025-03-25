@@ -22,7 +22,16 @@ pipeline {
 
         stage('Build Project') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                sh '''
+                echo "Building the project..."
+                mvn clean package -DskipTests
+                
+                echo "Current Directory:"
+                pwd
+
+                echo "Listing files in target directory:"
+                ls -l target/
+                '''
             }
         }
 
@@ -30,7 +39,13 @@ pipeline {
             steps {
                 sh '''
                 echo "Stopping old application (if running)..."
-                pgrep -f "$APP_NAME" | xargs kill -9 || true
+                OLD_PID=$(pgrep -f "target/.*.jar" || echo "")
+                if [ ! -z "$OLD_PID" ]; then
+                    kill -9 $OLD_PID
+                    echo "Old process ($OLD_PID) stopped."
+                else
+                    echo "No running instance found."
+                fi
                 '''
             }
         }
@@ -39,26 +54,18 @@ pipeline {
             steps {
                 sh '''
                 echo "Starting new application..."
+                
                 JAR_FILE=$(ls target/*.jar | head -n 1)
-                chmod +x $JAR_FILE
-                nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} --server.address=0.0.0.0 > app.log 2>&1 &
-                disown
+                if [ -f "$JAR_FILE" ]; then
+                    chmod +x $JAR_FILE
+                    nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
+                    disown
+                    echo "Application started successfully!"
+                else
+                    echo "❌ ERROR: No JAR file found in target/ directory."
+                    exit 1
+                fi
                 '''
-            }
-        }
-
-        stage('Check Application Status') {
-            steps {
-                script {
-                    sleep(5)  // Give some time for the app to start
-                    sh '''
-                    echo "Checking if the application is running..."
-                    curl -s -o /dev/null -w "%{http_code}" http://localhost:${SERVER_PORT}
-                    echo ""
-                    echo "Last 10 lines of the application log:"
-                    tail -n 10 app.log
-                    '''
-                }
             }
         }
     }
