@@ -30,7 +30,7 @@ pipeline {
             steps {
                 sh '''
                 echo "Stopping old application (if running)..."
-                pgrep -f "target/.*.jar" | xargs kill -9 || true
+                pgrep -f "$APP_NAME" | xargs kill -9 || true
                 '''
             }
         }
@@ -41,7 +41,8 @@ pipeline {
                 echo "Starting new application..."
                 JAR_FILE=$(ls target/*.jar | head -n 1)
                 chmod +x $JAR_FILE
-                nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
+                nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} --server.address=0.0.0.0 > app.log 2>&1 &
+                disown
                 '''
             }
         }
