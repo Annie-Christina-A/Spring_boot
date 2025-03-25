@@ -42,6 +42,7 @@ pipeline {
                 JAR_FILE=$(ls target/*.jar | head -n 1)
                 chmod +x $JAR_FILE
                 nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
+                disown
                 '''
             }
         }
