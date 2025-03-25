@@ -4,6 +4,7 @@ pipeline {
     environment {
         APP_NAME = "SpringBootApp"
         SERVER_PORT = "8081"
+        DATA_DIR = "data"
     }
 
     stages {
@@ -35,11 +36,33 @@ pipeline {
             }
         }
 
+        stage('Move JAR to Data Directory') {
+            steps {
+                sh '''
+                echo "Creating data directory if not exists..."
+                mkdir -p ${DATA_DIR}
+
+                echo "Moving JAR file to data directory..."
+                JAR_FILE=$(ls target/*.jar | head -n 1)
+                if [ -f "$JAR_FILE" ]; then
+                    mv $JAR_FILE ${DATA_DIR}/
+                    echo "JAR file moved successfully."
+                else
+                    echo "❌ ERROR: No JAR file found in target/ directory."
+                    exit 1
+                fi
+
+                echo "Listing files in data directory:"
+                ls -l ${DATA_DIR}/
+                '''
+            }
+        }
+
         stage('Stop Previous Instance') {
             steps {
                 sh '''
                 echo "Stopping old application (if running)..."
-                OLD_PID=$(pgrep -f "target/.*.jar" || echo "")
+                OLD_PID=$(pgrep -f "${DATA_DIR}/.*.jar" || echo "")
                 if [ ! -z "$OLD_PID" ]; then
                     kill -9 $OLD_PID
                     echo "Old process ($OLD_PID) stopped."
@@ -55,14 +78,14 @@ pipeline {
                 sh '''
                 echo "Starting new application..."
                 
-                JAR_FILE=$(ls target/*.jar | head -n 1)
+                JAR_FILE=$(ls ${DATA_DIR}/*.jar | head -n 1)
                 if [ -f "$JAR_FILE" ]; then
                     chmod +x $JAR_FILE
                     nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
                     disown
                     echo "Application started successfully!"
                 else
-                    echo "❌ ERROR: No JAR file found in target/ directory."
+                    echo "❌ ERROR: No JAR file found in data/ directory."
                     exit 1
                 fi
                 '''
