@@ -2,16 +2,16 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = "SpringBootApp"
-        SERVER_PORT = "8081"
-        DATA_DIR = "data"
+        JAR_NAME = "spring-boot-hello-world-example-0.0.1-SNAPSHOT.jar"
+        APP_DIR = "data"
+        PORT = "8081"
     }
 
     stages {
-        stage('Clone Repository') {
+        stage('Checkout Repository') {
             steps {
                 echo "📥 Cloning the repository..."
-                git branch: 'main', url: 'https://github.com/Annie-Christina-A/Spring_boot.git'
+                checkout scm
             }
         }
 
@@ -26,107 +26,65 @@ pipeline {
         stage('Build Project') {
             steps {
                 echo "🏗️ Building the Spring Boot application..."
-                sh '''
-                mvn clean package -DskipTests
-                echo "✅ Build successful!"
-                '''
+                sh 'mvn clean package -DskipTests'
             }
         }
 
         stage('Verify Build Artifacts') {
             steps {
                 echo "📂 Checking the built JAR file..."
-                sh '''
-                echo "Current Directory: $(pwd)"
-                echo "Listing files in target directory:"
-                ls -lh target/
-                '''
+                sh "ls -lh target/"
             }
         }
 
         stage('Move JAR to Data Directory') {
             steps {
-                echo "📦 Moving JAR file to 'data' directory..."
-                sh '''
-                mkdir -p ${DATA_DIR}
-                JAR_FILE=$(ls target/*.jar | head -n 1)
-                if [ -f "$JAR_FILE" ]; then
-                    mv $JAR_FILE ${DATA_DIR}/
+                script {
+                    sh "mkdir -p ${APP_DIR}"
+                    sh "mv target/${JAR_NAME} ${APP_DIR}/"
                     echo "✅ JAR file moved successfully."
-                else
-                    echo "❌ ERROR: No JAR file found in target/ directory."
-                    exit 1
-                fi
-                echo "Listing files in data directory:"
-                ls -lh ${DATA_DIR}/
-                '''
+                }
             }
         }
 
         stage('Stop Previous Instance') {
             steps {
-                echo "🛑 Stopping old application instance..."
-                sh '''
-                OLD_PID=$(pgrep -f "${DATA_DIR}/.*.jar" || echo "")
-                if [ ! -z "$OLD_PID" ]; then
-                    kill -9 $OLD_PID
-                    echo "✅ Old process ($OLD_PID) stopped."
-                else
-                    echo "ℹ️ No running instance found."
-                fi
-                '''
+                script {
+                    def oldPid = sh(script: "pgrep -f ${APP_DIR}/${JAR_NAME}", returnStdout: true).trim()
+                    if (oldPid) {
+                        echo "🛑 Stopping old application instance (PID: ${oldPid})..."
+                        sh "kill -9 ${oldPid}"
+                    } else {
+                        echo "ℹ️ No running instance found."
+                    }
+                }
             }
         }
 
         stage('Run Application') {
             steps {
-                echo "🚀 Starting new application..."
-                sh '''
-                JAR_FILE=$(ls ${DATA_DIR}/*.jar | head -n 1)
-                if [ -f "$JAR_FILE" ]; then
-                    chmod +x $JAR_FILE
-                    nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
+                script {
+                    echo "🚀 Starting new application..."
+                    sh "chmod +x ${APP_DIR}/${JAR_NAME}"
+                    sh "nohup java -jar ${APP_DIR}/${JAR_NAME} --server.port=${PORT} > ${APP_DIR}/app.log 2>&1 &"
                     echo "✅ Application started successfully!"
-                else
-                    echo "❌ ERROR: No JAR file found in data/ directory."
-                    exit 1
-                fi
-                '''
+                }
             }
         }
 
         stage('Check Application Status') {
             steps {
                 script {
-                    sleep(5)  // Wait for the app to start
-                    sh '''
                     echo "🔍 Checking if the application is running..."
-                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${SERVER_PORT})
-                    if [ "$STATUS" == "200" ]; then
-                        echo "✅ Application is running successfully!"
-                    else
-                        echo "❌ ERROR: Application is NOT accessible on port ${SERVER_PORT}."
-                        exit 1
-                    fi
-                    '''
+                    sleep 5
+                    def status = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://localhost:${PORT}", returnStdout: true).trim()
+                    if (status == "200") {
+                        echo "✅ Application is running successfully on port ${PORT}!"
+                    } else {
+                        error "❌ Application failed to start. Check logs in ${APP_DIR}/app.log."
+                    }
                 }
             }
-        }
-    }
-
-    post {
-        success {
-            script {
-                echo "✅ Build and deployment successful! App is running on port ${SERVER_PORT}"
-                sh '''
-                echo "🌍 Access your application using:"
-                echo "➡ Localhost: http://localhost:${SERVER_PORT}"
-                echo "➡ Public URL (if firewall allows it): http://$(curl -s ifconfig.me):${SERVER_PORT}"
-                '''
-            }
-        }
-        failure {
-            echo "❌ Build failed. Check the console output for errors."
         }
     }
 }
