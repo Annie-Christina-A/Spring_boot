@@ -2,47 +2,41 @@ pipeline {
     agent any
 
     environment {
-        JAR_NAME = "spring-boot-hello-world-example-0.0.1-SNAPSHOT.jar"
-        APP_DIR = "data"
-        PORT = "8081"
+        APP_NAME = "SpringBootApp"
+        SERVER_PORT = "8081"
+        JAR_DIR = "target"
     }
 
     stages {
-        stage('Checkout Repository') {
+        stage('Clone Repository') {
             steps {
-                echo "📥 Cloning the repository..."
-                checkout scm
+                script {
+                    echo "📥 Cloning the repository..."
+                    git branch: 'main', url: 'https://github.com/Annie-Christina-A/Spring_boot.git'
+                    sh 'pwd'   // Print working directory
+                    sh 'ls -la' // List cloned files
+                }
             }
         }
 
         stage('Setup Java and Maven') {
             steps {
-                echo "🔍 Checking Java and Maven versions..."
-                sh 'java -version'
-                sh 'mvn -version'
+                script {
+                    echo "🔧 Checking Java & Maven versions..."
+                    sh 'java -version'
+                    sh 'mvn -version'
+                }
             }
         }
 
         stage('Build Project') {
             steps {
-                echo "🏗️ Building the Spring Boot application..."
-                sh 'mvn clean package -DskipTests'
-            }
-        }
-
-        stage('Verify Build Artifacts') {
-            steps {
-                echo "📂 Checking the built JAR file..."
-                sh "ls -lh target/"
-            }
-        }
-
-        stage('Move JAR to Data Directory') {
-            steps {
                 script {
-                    sh "mkdir -p ${APP_DIR}"
-                    sh "mv target/${JAR_NAME} ${APP_DIR}/"
-                    echo "✅ JAR file moved successfully."
+                    echo "🏗️ Building the Spring Boot project..."
+                    sh '''
+                        mvn clean package -DskipTests
+                        ls -lh target/
+                    '''
                 }
             }
         }
@@ -50,13 +44,19 @@ pipeline {
         stage('Stop Previous Instance') {
             steps {
                 script {
-                    def oldPid = sh(script: "pgrep -f ${APP_DIR}/${JAR_NAME}", returnStdout: true).trim()
-                    if (oldPid) {
-                        echo "🛑 Stopping old application instance (PID: ${oldPid})..."
-                        sh "kill -9 ${oldPid}"
-                    } else {
-                        echo "ℹ️ No running instance found."
-                    }
+                    echo "🛑 Stopping previous instance (if running)..."
+                    sh '''
+                        if [ -f app.pid ]; then
+                            PID=$(cat app.pid)
+                            if ps -p $PID > /dev/null; then
+                                echo "Stopping process $PID..."
+                                kill -9 $PID || true
+                            else
+                                echo "No running instance found."
+                            fi
+                            rm -f app.pid
+                        fi
+                    '''
                 }
             }
         }
@@ -64,25 +64,19 @@ pipeline {
         stage('Run Application') {
             steps {
                 script {
-                    echo "🚀 Starting new application..."
-                    sh "chmod +x ${APP_DIR}/${JAR_NAME}"
-                    sh "nohup java -jar ${APP_DIR}/${JAR_NAME} --server.port=${PORT} > ${APP_DIR}/app.log 2>&1 &"
-                    echo "✅ Application started successfully!"
-                }
-            }
-        }
-
-        stage('Check Application Status') {
-            steps {
-                script {
-                    echo "🔍 Checking if the application is running..."
-                    sleep 5
-                    def status = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://localhost:${PORT}", returnStdout: true).trim()
-                    if (status == "200") {
-                        echo "✅ Application is running successfully on port ${PORT}!"
-                    } else {
-                        error "❌ Application failed to start. Check logs in ${APP_DIR}/app.log."
-                    }
+                    echo "🚀 Starting the application..."
+                    sh '''
+                        JAR_FILE=$(ls target/*.jar | head -n 1)
+                        if [ -f "$JAR_FILE" ]; then
+                            chmod +x $JAR_FILE
+                            nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
+                            echo $! > app.pid  # Store process ID
+                            echo "✅ Application started successfully!"
+                        else
+                            echo "❌ No JAR file found in target/. Build might have failed."
+                            exit 1
+                        fi
+                    '''
                 }
             }
         }
@@ -90,10 +84,10 @@ pipeline {
 
     post {
         success {
-            echo "🎉 Build and deployment successful!"
+            echo "🎉 Build and deployment successful! App is running on port ${SERVER_PORT}"
         }
         failure {
-            echo "❌ Build or deployment failed. Check logs!"
+            echo "❌ Build or execution failed. Check logs."
         }
     }
 }
