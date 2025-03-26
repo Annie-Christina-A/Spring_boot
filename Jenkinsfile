@@ -87,4 +87,13 @@ pipeline {
             }
         }
     }
+
+    post {
+        success {
+            echo "🎉 Build and deployment successful!"
+        }
+        failure {
+            echo "❌ Build or deployment failed. Check logs!"
+        }
+    }
 }
