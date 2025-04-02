@@ -1,0 +1,18 @@
+version: 0.2
+
+phases:
+    install:
+      commands:
+       - echo "Installing dependencies..."
+       - mvn clean install  # This will download dependencies and build the project
+
+     build:
+       commands:
+        - echo "Building Spring Boot application..."
+        - mvn package  # This will generate the JAR file
+
+     artifacts:
+       files:
+        - "target/*.jar"  # Include only the built JAR file
+       discard-paths: no
+
