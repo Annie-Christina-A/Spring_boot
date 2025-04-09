@@ -13,7 +13,7 @@ pipeline {
                     echo "📥 Cloning the repository..."
                     git branch: 'main', url: 'https://github.com/Annie-Christina-A/Spring_boot.git'
                     sh 'pwd'
-                    sh 'ls -la'
+                    sh 'ls -a'
                 }
             }
         }
