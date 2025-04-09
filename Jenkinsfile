@@ -2,10 +2,8 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = "SpringBootApp"
+        APP_NAME = "springbootapp"
         SERVER_PORT = "8081"
-        JAR_DIR = "target"
-        APP_DIR = "data"
     }
 
     stages {
@@ -14,8 +12,8 @@ pipeline {
                 script {
                     echo "📥 Cloning the repository..."
                     git branch: 'main', url: 'https://github.com/Annie-Christina-A/Spring_boot.git'
-                    sh 'pwd'   // Print working directory
-                    sh 'ls -la' // List cloned files
+                    sh 'pwd'
+                    sh 'ls -la'
                 }
             }
         }
@@ -23,7 +21,7 @@ pipeline {
         stage('Setup Java and Maven') {
             steps {
                 script {
-                    echo "🔧 Checking Java & Maven versions..."
+                    echo "🔧 Checking Java & Maven..."
                     sh 'java -version'
                     sh 'mvn -version'
                 }
@@ -42,62 +40,37 @@ pipeline {
             }
         }
 
-        stage('Move JAR to Data Directory') {
+        stage('Build Docker Image') {
             steps {
                 script {
-                    echo "📂 Moving JAR file to 'data' directory..."
+                    echo "🐳 Building Docker image..."
                     sh '''
-                        mkdir -p ${APP_DIR}  # Ensure 'data' directory exists
-                        JAR_FILE=$(ls target/*.jar | head -n 1)
-                        if [ -f "$JAR_FILE" ]; then
-                            mv $JAR_FILE ${APP_DIR}/
-                            echo "✅ JAR file moved to ${APP_DIR}/"
-                            ls -lh ${APP_DIR}/  # Verify move
-                        else
-                            echo "❌ No JAR file found in target/. Build might have failed."
-                            exit 1
-                        fi
+                        docker build -t ${APP_NAME}:latest .
+                        docker images | grep ${APP_NAME}
                     '''
                 }
             }
         }
 
-        stage('Stop Previous Instance') {
+        stage('Stop & Remove Previous Container') {
             steps {
                 script {
-                    echo "🛑 Stopping previous instance (if running)..."
+                    echo "🛑 Cleaning up old Docker containers..."
                     sh '''
-                        if [ -f app.pid ]; then
-                            PID=$(cat app.pid)
-                            if ps -p $PID > /dev/null; then
-                                echo "Stopping process $PID..."
-                                kill -9 $PID || true
-                            else
-                                echo "No running instance found."
-                            fi
-                            rm -f app.pid
-                        fi
+                        docker stop ${APP_NAME} || true
+                        docker rm ${APP_NAME} || true
                     '''
                 }
             }
         }
 
-        stage('Run Application') {
+        stage('Run Docker Container') {
             steps {
                 script {
-                    echo "🚀 Starting the application..."
+                    echo "🚀 Running the Docker container..."
                     sh '''
-                        JAR_FILE=$(ls ${APP_DIR}/*.jar | head -n 1)
-                        if [ -f "$JAR_FILE" ]; then
-                            chmod +x $JAR_FILE
-                            nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > ${APP_DIR}/app.log 2>&1 &
-                            echo $! > app.pid  # Store process ID
-                            echo "✅ Application started successfully!"
-                            pwd  # Print the working directory after starting the app
-                        else
-                            echo "❌ No JAR file found in ${APP_DIR}/. Build might have failed."
-                            exit 1
-                        fi
+                        docker run -d --name ${APP_NAME} -p ${SERVER_PORT}:${SERVER_PORT} ${APP_NAME}:latest
+                        docker ps | grep ${APP_NAME}
                     '''
                 }
             }
@@ -106,10 +79,10 @@ pipeline {
 
     post {
         success {
-            echo "🎉 Build and deployment successful! App is running on port ${SERVER_PORT}"
+            echo "🎉 Build and deployment successful! Docker container is running on port ${SERVER_PORT}"
         }
         failure {
-            echo "❌ Build or execution failed. Check logs."
+            echo "❌ Something went wrong. Check logs above for errors."
         }
     }
 }
