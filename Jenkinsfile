@@ -2,60 +2,46 @@ pipeline {
     agent any
 
     environment {
-        REPO_URL = "https://github.com/Annie-Christina-A/Spring_boot.git"
-        BRANCH = "main"
-        PEM_FILE = "jenkins-ec2.pem"               // Make sure this key is already in Jenkins workspace
-        EC2_USER = "ec2-user"                      // Amazon Linux default user
-        EC2_HOST = "13.60.9.77"          // Replace with public IP from your Terraform output
-        APP_DIR = "data"
+        APP_NAME = "SpringBootApp"
         SERVER_PORT = "8081"
-        REMOTE_APP_DIR = "/home/ec2-user/app"
     }
 
     stages {
-
-        stage('Clone Application Repo') {
+        stage('Clone Repository') {
             steps {
-                git branch: "${BRANCH}", url: "${REPO_URL}"
+                git branch: 'main', url: 'https://github.com/Annie-Christina-A/Spring_boot.git'
             }
         }
 
-        stage('Build Spring Boot App') {
+        stage('Setup Java and Maven') {
+            steps {
+                sh 'java -version'
+                sh 'mvn -version'
+            }
+        }
+
+        stage('Build Project') {
+            steps {
+                sh 'mvn clean package -DskipTests'
+            }
+        }
+
+        stage('Stop Previous Instance') {
             steps {
                 sh '''
-                    mvn clean package -DskipTests
+                echo "Stopping old application (if running)..."
+                pgrep -f "target/.*.jar" | xargs kill -9 || true
                 '''
             }
         }
 
-        stage('Prepare JAR') {
+        stage('Run Application') {
             steps {
                 sh '''
-                    mkdir -p ${APP_DIR}
-                    JAR_FILE=$(ls target/*.jar | head -n 1)
-                    cp $JAR_FILE ${APP_DIR}/
-                '''
-            }
-        }
-
-        stage('Transfer JAR to EC2') {
-            steps {
-                sh '''
-                    chmod 600 ${PEM_FILE}
-                    ssh -o StrictHostKeyChecking=no -i ${PEM_FILE} ${EC2_USER}@${EC2_HOST} "mkdir -p ${REMOTE_APP_DIR}"
-                    scp -i ${PEM_FILE} ${APP_DIR}/*.jar ${EC2_USER}@${EC2_HOST}:${REMOTE_APP_DIR}/
-                '''
-            }
-        }
-
-        stage('Run App on EC2') {
-            steps {
-                sh '''
-                    ssh -o StrictHostKeyChecking=no -i ${PEM_FILE} ${EC2_USER}@${EC2_HOST} << EOF
-                    pkill -f "java -jar" || true
-                    nohup java -jar ${REMOTE_APP_DIR}/*.jar --server.port=${SERVER_PORT} > ${REMOTE_APP_DIR}/app.log 2>&1 &
-                    echo "App deployed at http://${EC2_HOST}:${SERVER_PORT}"
-                    EOF
+                echo "Starting new application..."
+                JAR_FILE=$(ls target/*.jar | head -n 1)
+                chmod +x $JAR_FILE
+                nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
                 '''
             }
         }
@@ -63,10 +49,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Spring Boot app deployed successfully on EC2 at http://${EC2_HOST}:${SERVER_PORT}"
+            echo "✅ Build and deployment successful! App is running on port ${SERVER_PORT}"
         }
         failure {
-            echo "❌ Deployment failed. Check EC2 SSH access and logs."
+            echo "❌ Build failed. Check the console output for errors."
         }
     }
 }
