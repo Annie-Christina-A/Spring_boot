@@ -2,47 +2,70 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = "SpringBootApp"
-        SERVER_PORT = "8081"
+        JAR_NAME = ''
     }
 
     stages {
         stage('Clone Repository') {
             steps {
-                git branch: 'main', url: 'https://github.com/Annie-Christina-A/Spring_boot.git'
+                git url: 'https://github.com/anniechr/spring-boot-hello-world-example.git', branch: 'main'
             }
         }
 
-        stage('Setup Java and Maven') {
+        stage('Build with Maven') {
             steps {
-                sh 'java -version'
-                sh 'mvn -version'
+                sh 'mvn clean install -DskipTests'
             }
         }
 
-        stage('Build Project') {
+        stage('Prepare JAR File') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                script {
+                    JAR_NAME = sh(script: "ls target/*.jar | grep -v 'original' | head -n 1", returnStdout: true).trim()
+                    echo "Using JAR: ${JAR_NAME}"
+                }
             }
         }
-        stage('Run Application') {
+
+        stage('Stop Previous App') {
             steps {
-                sh '''
-                echo "Starting new application..."
-                JAR_FILE=$(ls target/*.jar | head -n 1)
-                chmod +x $JAR_FILE
-                nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
-                '''
+                script {
+                    sh """
+                        PID=\$(lsof -t -i:8081)
+                        if [ ! -z "\$PID" ]; then
+                            echo "Killing existing process on port 8081 (PID: \$PID)"
+                            kill -9 \$PID
+                        else
+                            echo "No process running on port 8081"
+                        fi
+                    """
+                }
+            }
+        }
+
+        stage('Run Spring Boot App') {
+            steps {
+                script {
+                    sh """
+                        nohup java -jar ${JAR_NAME} --server.port=8081 > springboot.log 2>&1 &
+                        sleep 10
+                        echo "Checking if application started..."
+                        ps aux | grep java
+                    """
+                }
+            }
+        }
+
+        stage('Test App Endpoint') {
+            steps {
+                sh 'curl -v http://localhost:8081 || true'
             }
         }
     }
 
     post {
-        success {
-            echo "✅ Build and deployment successful! App is running on port ${SERVER_PORT}"
-        }
-        failure {
-            echo "❌ Build failed. Check the console output for errors."
+        always {
+            echo 'Pipeline execution finished.'
         }
     }
 }
