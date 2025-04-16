@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                git url: 'https://github.com/anniechr/spring-boot-hello-world-example.git', branch: 'main'
+                git url: 'https://github.com/Annie-Christina-A/Spring_boot.git', branch: 'main'
             }
         }
 
