@@ -39,9 +39,9 @@ pipeline {
             steps {
                 sh '''
                 echo "Starting new application..."
-                JAR_FILE=$(ls target/*.jar | head -n 1)
-                chmod +x $JAR_FILE
-                nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
+                java -jar spring-boot-hello-world-example-0.0.1-SNAPSHOT.jar \
+                            --server.port=8081 \
+                            --server.address=0.0.0.0
                 '''
             }
         }
