@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        SERVER_PORT = "8081"
+        SERVER_PORT = "9097"
     }
 
     stages {
