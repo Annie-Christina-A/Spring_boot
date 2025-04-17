@@ -8,7 +8,7 @@ pipeline {
             steps {
                 script {
                     echo "Cloning the private GitHub repository..."
-                    sh '''
+                    bat '''
                         git clone https://github.com/Annie-Christina-A/Spring_boot.git
                         
                     '''
@@ -19,7 +19,7 @@ pipeline {
             steps {
                 script {
                     echo "Building the Spring Boot application..."
-                    sh '''
+                    bat '''
                         mvn clean package
                         ls -la target/
                     '''
@@ -30,7 +30,7 @@ pipeline {
             steps {
                 script {
                     echo "Moving the JAR file to shared directory for Windows access..."
-                    sh '''
+                    bat '''
                         mkdir -p /mnt/c/jenkins-share/data
                         cp target/*.jar /mnt/c/jenkins-share/data/
                         ls -la /mnt/c/jenkins-share/data/
@@ -42,7 +42,7 @@ pipeline {
             steps {
                 script {
                     echo "Restarting Windows service hosting Spring Boot app..."
-                    sh '''
+                    bat '''
                     cd /mnt/c/jenkins-share/data/
                     java -version
                     sudo /home/poc-user/start-spring.sh
