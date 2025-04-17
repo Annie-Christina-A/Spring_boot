@@ -1,58 +1,62 @@
 pipeline {
     agent any
-
     environment {
-        APP_NAME = "SpringBootApp"
-        SERVER_PORT = "8081"
+        GITHUB_CREDENTIALS = credentials('github-id') // GitHub credentials stored in Jenkins
     }
-
     stages {
         stage('Clone Repository') {
             steps {
-                git branch: 'main', url: 'https://github.com/Annie-Christina-A/Spring_boot.git'
+                script {
+                    echo "Cloning the private GitHub repository..."
+                    sh '''
+                        git clone https://github.com/Annie-Christina-A/Spring_boot.git
+                        
+                    '''
+                }
             }
         }
-
-        stage('Setup Java and Maven') {
+        stage('Build Application') {
             steps {
-                sh 'java -version'
-                sh 'mvn -version'
+                script {
+                    echo "Building the Spring Boot application..."
+                    sh '''
+                        mvn clean package
+                        ls -la target/
+                    '''
+                }
             }
         }
-
-        stage('Build Project') {
+        stage('Move JAR to Shared Directory') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                script {
+                    echo "Moving the JAR file to shared directory for Windows access..."
+                    sh '''
+                        mkdir -p /mnt/c/jenkins-share/data
+                        cp target/*.jar /mnt/c/jenkins-share/data/
+                        ls -la /mnt/c/jenkins-share/data/
+                    '''
+                }
             }
         }
-
-        stage('Stop Previous Instance') {
+        stage('Restart Windows Service') {
             steps {
-                sh '''
-                echo "Stopping old application (if running)..."
-                pgrep -f "target/.*.jar" | xargs kill -9 || true
-                '''
-            }
-        }
-
-        stage('Run Application') {
-            steps {
-                sh '''
-                echo "Starting new application..."
-                JAR_FILE=$(ls target/*.jar | head -n 1)
-                chmod +x $JAR_FILE
-                nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
-                '''
+                script {
+                    echo "Restarting Windows service hosting Spring Boot app..."
+                    sh '''
+                    cd /mnt/c/jenkins-share/data/
+                    java -version
+                    sudo /home/poc-user/start-spring.sh
+                    '''
+                }
             }
         }
     }
-
     post {
         success {
-            echo "✅ Build and deployment successful! App is running on port ${SERVER_PORT}"
+            echo "Deployment complete. Application is running and reverse proxied by IIS."
         }
         failure {
-            echo "❌ Build failed. Check the console output for errors."
+            echo "Pipeline failed. Please check logs."
         }
     }
 }
