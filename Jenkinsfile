@@ -2,42 +2,46 @@ pipeline {
     agent any
 
     environment {
-        SERVER_PORT = "9097"
+        APP_NAME = "SpringBootApp"
+        SERVER_PORT = "8081"
     }
 
     stages {
         stage('Clone Repository') {
             steps {
-                echo "📥 Cloning public GitHub repository..."
                 git branch: 'main', url: 'https://github.com/Annie-Christina-A/Spring_boot.git'
-                sh 'ls -la'
             }
         }
 
-        stage('Build Application') {
+        stage('Setup Java and Maven') {
             steps {
-                echo "🔨 Building Spring Boot project..."
+                sh 'java -version'
+                sh 'mvn -version'
+            }
+        }
+
+        stage('Build Project') {
+            steps {
                 sh 'mvn clean package -DskipTests'
             }
         }
 
-        stage('Stop Previous App') {
+        stage('Stop Previous Instance') {
             steps {
-                echo "🛑 Stopping previous instance if running..."
                 sh '''
-                    pkill -f "springboot-jenkins-app-0.0.1-SNAPSHOT.jar" || true
+                echo "Stopping old application (if running)..."
+                pgrep -f "target/.*.jar" | xargs kill -9 || true
                 '''
             }
         }
 
         stage('Run Application') {
             steps {
-                echo "🚀 Starting application on port ${SERVER_PORT}..."
                 sh '''
-                    JAR_FILE=$(ls target/*.jar | head -n 1)
-                    nohup java -jar $JAR_FILE \
-                        --server.port=${SERVER_PORT} \
-                        --server.address=0.0.0.0 > app.log 2>&1 &
+                echo "Starting new application..."
+                JAR_FILE=$(ls target/*.jar | head -n 1)
+                chmod +x $JAR_FILE
+                nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
                 '''
             }
         }
@@ -45,10 +49,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Application deployed successfully on port ${SERVER_PORT}"
+            echo "✅ Build and deployment successful! App is running on port ${SERVER_PORT}"
         }
         failure {
-            echo "❌ Deployment failed. Check logs and console output."
+            echo "❌ Build failed. Check the console output for errors."
         }
     }
 }
