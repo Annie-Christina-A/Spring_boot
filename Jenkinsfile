@@ -8,26 +8,36 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                // Clone your Spring Boot repo
-                git 'https://github.com/Annie-Christina-A/Spring_boot.git'
+                echo "📥 Cloning public GitHub repository..."
+                git branch: 'main', url: 'https://github.com/Annie-Christina-A/Spring_boot.git'
+                sh 'ls -la'
             }
         }
 
-        stage('Build Project') {
+        stage('Build Application') {
             steps {
-                // Build the project with Maven
+                echo "🔨 Building Spring Boot project..."
                 sh 'mvn clean package -DskipTests'
             }
         }
 
+        stage('Stop Previous App') {
+            steps {
+                echo "🛑 Stopping previous instance if running..."
+                sh '''
+                    pkill -f "springboot-jenkins-app-0.0.1-SNAPSHOT.jar" || true
+                '''
+            }
+        }
 
         stage('Run Application') {
             steps {
-                // Start the app on port 8081 and bind to all network interfaces
+                echo "🚀 Starting application on port ${SERVER_PORT}..."
                 sh '''
-                echo "Starting app on port ${SERVER_PORT}..."
-                JAR_FILE=$(ls target/*.jar | head -n 1)
-                nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} --server.address=0.0.0.0 > app.log 2>&1 &
+                    JAR_FILE=$(ls target/*.jar | head -n 1)
+                    nohup java -jar $JAR_FILE \
+                        --server.port=${SERVER_PORT} \
+                        --server.address=0.0.0.0 > app.log 2>&1 &
                 '''
             }
         }
@@ -35,10 +45,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ App is running on port ${SERVER_PORT}"
+            echo "✅ Application deployed successfully on port ${SERVER_PORT}"
         }
         failure {
-            echo "❌ Something went wrong. Check logs."
+            echo "❌ Deployment failed. Check logs and console output."
         }
     }
 }
