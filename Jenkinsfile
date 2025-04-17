@@ -20,15 +20,6 @@ pipeline {
             }
         }
 
-        stage('Stop Previous App') {
-            steps {
-                // Stop any running Spring Boot app
-                sh '''
-                echo "Stopping existing app..."
-                pgrep -f "target/.*.jar" | xargs kill -9 || true
-                '''
-            }
-        }
 
         stage('Run Application') {
             steps {
