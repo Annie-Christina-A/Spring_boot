@@ -2,34 +2,29 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = "SpringBootApp"
         SERVER_PORT = "8081"
     }
 
     stages {
         stage('Clone Repository') {
             steps {
-                git branch: 'main', url: 'https://github.com/Annie-Christina-A/Spring_boot.git'
-            }
-        }
-
-        stage('Setup Java and Maven') {
-            steps {
-                sh 'java -version'
-                sh 'mvn -version'
+                // Clone your Spring Boot repo
+                git 'https://github.com/Annie-Christina-A/Spring_boot.git'
             }
         }
 
         stage('Build Project') {
             steps {
+                // Build the project with Maven
                 sh 'mvn clean package -DskipTests'
             }
         }
 
-        stage('Stop Previous Instance') {
+        stage('Stop Previous App') {
             steps {
+                // Stop any running Spring Boot app
                 sh '''
-                echo "Stopping old application (if running)..."
+                echo "Stopping existing app..."
                 pgrep -f "target/.*.jar" | xargs kill -9 || true
                 '''
             }
@@ -37,11 +32,11 @@ pipeline {
 
         stage('Run Application') {
             steps {
+                // Start the app on port 8081 and bind to all network interfaces
                 sh '''
-                echo "Starting new application..."
+                echo "Starting app on port ${SERVER_PORT}..."
                 JAR_FILE=$(ls target/*.jar | head -n 1)
-                chmod +x $JAR_FILE
-                nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} > app.log 2>&1 &
+                nohup java -jar $JAR_FILE --server.port=${SERVER_PORT} --server.address=0.0.0.0 > app.log 2>&1 &
                 '''
             }
         }
@@ -49,10 +44,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Build and deployment successful! App is running on port ${SERVER_PORT}"
+            echo "✅ App is running on port ${SERVER_PORT}"
         }
         failure {
-            echo "❌ Build failed. Check the console output for errors."
+            echo "❌ Something went wrong. Check logs."
         }
     }
 }
